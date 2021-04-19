@@ -9,11 +9,18 @@ int GetEntityAtCrossHair(HANDLE hProc);
 
 int main() {
 	HANDLE hProcess = 0;
-	uintptr_t moduleBase, localPlayerPtr, healthAddr, ammoAddr, grenadeAddr, pistolMaxAmmoAddr, ARMaxAmmoAddr, isAttackAddr;
-	moduleBase = localPlayerPtr = healthAddr = ammoAddr = grenadeAddr = pistolMaxAmmoAddr = ARMaxAmmoAddr = isAttackAddr = 0;
-	bool bHealthArmor, bAmmo, bRecoil, bFireRate, bAttack;
-	bHealthArmor = bAmmo = bRecoil = bFireRate = bAttack = false;
+	uintptr_t moduleBase, localPlayerPtr, healthAddr, ammoAddr, grenadeAddr, pistolMaxAmmoAddr, ARMaxAmmoAddr, isAttackAddr, flyAddr, noclipAddr;
+	moduleBase = localPlayerPtr = healthAddr = ammoAddr = grenadeAddr = pistolMaxAmmoAddr = ARMaxAmmoAddr = isAttackAddr = flyAddr = noclipAddr = 0;
+	bool bHealthArmor, bAmmo, bRecoil, bFireRate, bAttack, bNoclip, bFly;
+	bHealthArmor = bAmmo = bRecoil = bFireRate = bAttack = bNoclip = bFly = false;
 	const int refreshValue = 1000;
+
+	uintptr_t xAddr, yAddr, zAddr;
+	xAddr = yAddr = zAddr = 0;
+	float x, y, z;
+	x = y = z = 0;
+	int zero = 0;
+
 
 	DWORD procId = GetProcId(L"ac_client.exe");
 
@@ -28,6 +35,11 @@ int main() {
 		ARMaxAmmoAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x128 });
 		pistolMaxAmmoAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x114 });
 		isAttackAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x224 });
+		xAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x34 });
+		yAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x38 });
+		zAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x3C });
+		flyAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x338 });
+		noclipAddr = FindDMAAddy(hProcess, localPlayerPtr, { 0x82 });
 	}
 	else {
 		std::cout << "Process not found, press enter to exit\n";
@@ -89,22 +101,63 @@ int main() {
 		if (GetAsyncKeyState(VK_NUMPAD6) & 1) {
 			// I would call something like if (GetEntityAtCrossHair(hProcess)) to see if there is a valid entity, but alas, it keeps on crashing
 			bAttack = !bAttack;
+			if (bAttack) {
+				int one = 1;
+				mem::PatchEx((BYTE*)isAttackAddr, (BYTE*)&one, sizeof(one), hProcess);
+			}
+			else {
+				mem::PatchEx((BYTE*)isAttackAddr, (BYTE*)&zero, sizeof(zero), hProcess);
+			}
+		}
+		// Load x y z
+		if (GetAsyncKeyState(VK_NUMPAD7) & 1) {
+			ReadProcessMemory(hProcess, (BYTE*)xAddr, &x, sizeof(x), NULL);
+			ReadProcessMemory(hProcess, (BYTE*)yAddr, &y, sizeof(y), NULL);
+			ReadProcessMemory(hProcess, (BYTE*)zAddr, &z, sizeof(z), NULL);
 
+		}
+		if (GetAsyncKeyState(VK_NUMPAD8) & 1) {
+			bFly = !bFly;
+			if (bFly) {
+				int five = 5;
+				mem::PatchEx((BYTE*)flyAddr, (BYTE*)&five, sizeof(five), hProcess);
+			}
+			else {
+				mem::PatchEx((BYTE*)flyAddr, (BYTE*)&zero, sizeof(zero), hProcess);
+			}
+		}
+		if (GetAsyncKeyState(VK_NUMPAD9) & 1) {
+			bNoclip = !bNoclip;
+			if (bNoclip) {
+				int four = 4;
+				mem::PatchEx((BYTE*)noclipAddr, (BYTE*)&four, sizeof(four), hProcess);
+			}
+			else {
+				mem::PatchEx((BYTE*)noclipAddr, (BYTE*)&zero, sizeof(zero), hProcess);
+			}
+		}
+		// Teleport to stored x y z
+		if (GetAsyncKeyState(VK_SHIFT) ) {
+			
+			if (x != 0 && y != 0 && z != 0) {
+				mem::PatchEx((BYTE*)xAddr, (BYTE*)&x, 4, hProcess);
+				mem::PatchEx((BYTE*)yAddr, (BYTE*)&y, 4, hProcess);
+				mem::PatchEx((BYTE*)zAddr, (BYTE*)&z, 4, hProcess);
+
+			}
 		}
 		// Turn off hack
 		if (GetAsyncKeyState(VK_INSERT) & 1) {
 			return 0;
 		}
 
-		// Continous write or freeze
+		// Continous writes or freezes
 		if (bHealthArmor) {
-
 			mem::PatchEx((BYTE*)healthAddr, (BYTE*)&refreshValue, sizeof(refreshValue), hProcess);
 			mem::PatchEx((BYTE*)ammoAddr, (BYTE*)&refreshValue, sizeof(refreshValue), hProcess);
 		}
 		if (bAttack) {
-			int one = 1;
-			mem::PatchEx((BYTE*)isAttackAddr, (BYTE*)&one, sizeof(one), hProcess);
+
 		}
 		Sleep(10);
 	}
